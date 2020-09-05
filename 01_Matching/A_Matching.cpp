@@ -1,11 +1,32 @@
+#include <fstream>
 #include <iostream>
-#include <cstdio>
-#include <cstdlib>
-#include <stdexcept>
 
-#include <new>
 #include <vector>
 #include <set>
+
+
+struct Match {
+    
+    Match(const size_t& a_vertex,
+          const size_t& b_vertex);
+
+    void print() const;
+
+private:
+
+    size_t a_vertex,
+           b_vertex;
+};
+
+
+struct Matching {
+
+    void print() const;
+
+private:
+
+    std::set<Match> matches;
+};
 
 
 struct BipartileGraph {
@@ -13,49 +34,81 @@ struct BipartileGraph {
     BipartileGraph(const size_t& a_size,
                    const size_t& b_size);
 
-    void connect(const int& a_vertex,
-                 const int& b_vertex);
+    void connect(const size_t& a_vertex,
+                 const size_t& b_vertex);
 
-    void get_max_matching();
+    Matching get_max_matching() const;
 
-    void dump(FILE* file);
+    [[nodiscard]] size_t a_size() const;
+
+    // [[nodiscard]] size_t b_size();
+
+    void dump(std::ofstream& file) const;
 
 private:
 
-    std::vector<std::set<int>> a_vertex_neighbours;
+    std::vector<std::set<size_t>> a_vertex_neighbours;
 };
+
+
+void read_connections(BipartileGraph& graph);
 
 
 int main() {
 
-    static const int NEIGHBOUR_LINE_END = 0;
-
     size_t a_size = 0, b_size = 0;
-    std::cin >> a_size >> b_size;
+    std::cout << "# Enter size of left part: ";
+    std::cin >> a_size;
+    std::cout << "# Enter size of right part: ";
+    std::cin >> b_size;
 
     BipartileGraph graph(a_size, b_size);
 
-    int b_vertex = 0;
-    for (int a_vertex = 0; a_vertex < a_size; ++a_vertex) {
-        do {
-            std::cin >> b_vertex;
-            graph.connect(a_vertex, b_vertex);
-        } while (b_vertex != NEIGHBOUR_LINE_END);
-    }
+    read_connections(graph); 
 
-    graph.dump(stdout);
+    std::ofstream file("log.txt");
+    graph.dump(file);
+    file.close();
+
+    Matching max_matching = graph.get_max_matching();
+
+    max_matching.print();
 
     return 0;
 }
 
 
+void read_connections(BipartileGraph& graph) {
+    static const size_t NEIGHBOUR_LINE_END = 0;
+
+    std::cout << "Enter neighbours of left part vertexes\n";
+
+    for (size_t a_vertex = 0; a_vertex < graph.a_size(); ++a_vertex) {
+        std::cout << "Neighbours of " << a_vertex + 1 << " vertex: ";
+        for (size_t b_vertex = 0;;) {
+            std::cin >> b_vertex;
+            if (b_vertex == NEIGHBOUR_LINE_END) {
+                break;
+            }
+            graph.connect(a_vertex, b_vertex);
+        } 
+    } 
+}
+
+
+Matching BipartileGraph::get_max_matching() const {
+    std::cout << "getting max matching:\n";
+    return Matching();
+}
+
+
 BipartileGraph::BipartileGraph(const size_t& a_size,
                                const size_t& b_size)
-        : a_vertex_neighbours(std::vector<std::set<int>>(a_size)) {}
+        : a_vertex_neighbours(std::vector<std::set<size_t>>(a_size)) {}
 
 
-void BipartileGraph::connect(const int& a_vertex, 
-                             const int& b_vertex) {
+void BipartileGraph::connect(const size_t& a_vertex, 
+                             const size_t& b_vertex) {
     
     /* TODO: check if vertexes are in borders */
 
@@ -63,16 +116,33 @@ void BipartileGraph::connect(const int& a_vertex,
 }
 
 
-void BipartileGraph::dump(FILE* file) {
-    if (!file) {
-        throw std::runtime_error("Error: file");
-    }
+size_t BipartileGraph::a_size() const {
+    return a_vertex_neighbours.size();
+}
 
-    for (int a_vertex = 0; a_vertex < a_vertex_neighbours.size(); ++a_vertex) {
-        fprintf(file, "%d -> ", a_vertex + 1);
-        for (auto& neighbour : a_vertex_neighbours[a_vertex]) {
-            fprintf(file, "%d ", neighbour);
+
+void BipartileGraph::dump(std::ofstream& file) const {
+   
+    file << "BipartileGraph:\n";
+
+    for (size_t a_vertex = 0; a_vertex < a_size(); ++a_vertex) {
+        file << a_vertex + 1 << " -> ";
+        for (const auto& neighbour : a_vertex_neighbours[a_vertex]) {
+            file << neighbour << " ";
         }
-        fprintf(file, "\n");
+        file << std::endl;
     }
+}
+
+
+void Matching::print() const {
+    std::cout << "Matching -- " << matches.size() << ":\n";
+    for (const auto& match : matches) {
+        match.print();
+    }
+}
+
+
+void Match::print() const {
+    std::cout << a_vertex << " - " << b_vertex << "\n";
 }

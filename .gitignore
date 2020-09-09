@@ -1,3 +1,8 @@
+# Text files
+*.in
+*.txt
+*.out
+
 # Prerequisites
 *.d
 
@@ -31,5 +36,5 @@
 *.out
 *.app
 
-# vim swaps
+# Vim swaps
 *.swp

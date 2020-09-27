@@ -14,6 +14,7 @@ using std::queue;
 
 typedef int64_t flow_t;
 typedef int32_t vertex_t;
+typedef int32_t edge_t;
 
 static constexpr flow_t INF_FLOW = 0x100000000000;
 
@@ -25,7 +26,7 @@ struct Edge {
 
 /*---------------------------------------------------------------------------*/
 
-typedef vector<vector<vertex_t>> Graph;
+typedef vector<vector<edge_t>> Graph;
 typedef vector<Edge> EdgeVec;
 
 struct MaxFlowMeta {
@@ -90,7 +91,7 @@ flow_t find_max_flow(const vertex_t from, const vertex_t to, MaxFlowMeta& meta) 
 
 flow_t push_flow_bfs(const vertex_t from, const vertex_t to, MaxFlowMeta& meta) {
 
-    vector<vertex_t> path(meta.graph.size(), -1);
+    vector<edge_t> path(meta.graph.size(), -1);
 
     vector<bool> used(meta.graph.size(), false);
     queue<vertex_t> to_visit;
@@ -122,7 +123,7 @@ flow_t push_flow_bfs(const vertex_t from, const vertex_t to, MaxFlowMeta& meta) 
 /*---------------------------------------------------------------------------*/
 
 flow_t saturate_path(const vertex_t from, const vertex_t to, 
-                     const vector<vertex_t>& path,
+                     const vector<edge_t>& path,
                      MaxFlowMeta& meta) {
     
     flow_t flow = INF_FLOW;
@@ -197,7 +198,7 @@ void read_connections(MaxFlowMeta& meta) {
     meta.edges.resize(2 * n_edges);
     meta.graph.resize(n_vertexes);
 
-    for (int e = 0; e < static_cast<int64_t>(n_edges); ++e) {    
+    for (edge_t e = 0; e < static_cast<edge_t>(n_edges); ++e) {    
 
         Edge current_edge = {};
         
@@ -226,13 +227,3 @@ void read_connections(MaxFlowMeta& meta) {
 }
 
 /*===========================================================================*/
-
-
-
-
-
-
-
-
-
-

@@ -15,7 +15,7 @@ using std::vector;
 
 struct Edge {
 
-    using flow_t = int64_t;
+    using flow_t = long long;
     static constexpr flow_t INF_FLOW = LLONG_MAX;
 
     Edge(const int& v_from, const int& v_to, 
@@ -39,24 +39,43 @@ struct Edge {
 class Graph {
 public:
 
-    Graph()  = default;
+    Graph() = delete;
+
+    Graph(const size_t& left_size,
+          const size_t& right_size);
+
     ~Graph() = default;
 
-    void read_from_user();
-
-    void insert_edge(const int& from, const int& to, 
-                     const Edge::flow_t& capacity);
+    void connect(const int& left_vertice, 
+                 const int& right_vertice,
+                 const Edge::flow_t& capacity);
 
     void dump();
 
     size_t n_vertices();
 
+    size_t left_size();
+
+    size_t right_size();
+
     Edge::flow_t push_max_flow(const int& from, const int& to);
+
+    void set_sink(const vector<Edge::flow_t>& sink_cap); 
+   
+    Edge::flow_t min_sink();
+
+    void set_source(const vector<Edge::flow_t>& source_cap); 
 
 private:
 
     vector<Edge> edges;
     vector<vector<int>> incidence;
+
+    const size_t left_part_size,
+                 right_part_size;
+
+    void insert_edge(const int& from, const int& to, 
+                     const Edge::flow_t& capacity);
 
     /*------------------------------------------------------*/
 
@@ -76,25 +95,157 @@ private:
                                const vector<int>& path);
 };
 
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+void read_connections(Graph& graph);
+
+int get_degree(const char& c);
+
+bool check_connect(const int& y,  const int& x,
+                   const int& dy, const int& dx,
+                   const size_t& width,
+                   const size_t& height);
+
 /*==========================================================================*/
 
 int main() {
 
-    Graph graph;
-    graph.read_from_user();
+    static constexpr size_t MAX_PAPER_WIDTH = 50;
 
-    Edge::flow_t max_flow = graph.push_max_flow(1, static_cast<int>(graph.n_vertices()));
+    size_t paper_height = 0,
+           paper_width  = 0;
+    scanf("%lu %lu", &paper_height, &paper_width);
 
-    printf("%ld\n", max_flow);
+    const size_t paper_size = paper_width * paper_height;
+
+    vector<char[MAX_PAPER_WIDTH + 1]> paper(paper_height);
+    for (auto& line : paper) {
+        scanf("%s", line);
+    }
+    
+    if (1 == paper_size) {
+        printf("Invalid");
+        return 0;
+    }
+
+    const size_t n_whites = (paper_size + 1) / 2,
+                 n_blacks = paper_size - n_whites;
+
+    Graph graph(n_whites, n_blacks);
+
+    vector<Edge::flow_t> whites_deg(n_whites);
+    vector<Edge::flow_t> blacks_deg(n_blacks);
+    
+    Edge::flow_t whites_cap = 0,
+                 blacks_cap = 0;
+
+    const int delta[4][2] = {
+        {-1, 0},
+        {1,  0},
+        {0, -1},
+        {0,  1}
+    };
+
+    bool has_any_symbol = false;
+
+    for (int i = 0; i < paper_height; ++i) {
+        for (int j = 0; j < paper_width; ++j) {
+
+            int deg = get_degree(paper[i][j]);
+
+            if ('.' != paper[i][j]) {
+                has_any_symbol = true;
+            }
+
+            if (0 == (i + j) % 2) { 
+
+                whites_deg[(i * paper_width + j) / 2] = deg;
+                whites_cap += deg;
+
+                if ('.' != paper[i][j]) {
+
+                    for (size_t k = 0; k < 4; ++k) {
+                        if (check_connect(i, j, delta[k][0], delta[k][1], 
+                                          paper_width, paper_height) &&
+                            '.' != paper[i + delta[k][0]][j + delta[k][1]]) {
+
+                            graph.connect((i * paper_width + j) / 2 + 1, 
+                                          ((i + delta[k][0]) * paper_width + j + delta[k][1]) / 2 + 1, 
+                                          1LL);
+                        }
+                    }
+                }
+
+           } else { 
+
+                blacks_deg[(i * paper_width + j) / 2] = deg;
+                blacks_cap += deg;
+
+            }
+
+        }
+    }
+
+    graph.set_source(whites_deg);
+    graph.set_sink(blacks_deg);
+
+    if (blacks_cap != whites_cap ||
+        !has_any_symbol) {
+        printf("Invalid");
+        return 0;
+    }
+
+    Edge::flow_t flow = graph.push_max_flow(1, graph.n_vertices());
+
+    if (flow == blacks_cap) {
+        printf("Valid");
+    } else {
+        printf("Invalid");
+    }
 
     return 0;
 }
 
 /*==========================================================================*/
 
+bool check_connect(const int& y,  const int& x,
+                   const int& dy, const int& dx,
+                   const size_t& width,
+                   const size_t& height) {
+    return (0 <= y + dy && y + dy < height &&
+            0 <= x + dx && x + dx < width);
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+int get_degree(const char& c) {
+    
+    switch (c) {               
+        case '.':
+            return 0;
+
+        case 'H':
+            return 1;
+
+        case 'O':
+            return 2;
+
+        case 'N':
+            return 3;
+         
+        case 'C':
+            return 4;
+        
+        default:
+            throw std::runtime_error("unknown symbol");
+    }
+}
+
+/*==========================================================================*/
+
 Edge::flow_t Graph::push_max_flow(const int& from, const int& to) {
 
-    return edmonds_karp(from - 1, to - 1);
+    return ford_fulkerson(from - 1, to - 1);
 }
 
 /*==========================================================================*/
@@ -140,7 +291,6 @@ Edge::flow_t Graph::push_flow_bfs(const int& from, const int& to) {
             }
         }
     }
-
 
     return 0;
 }
@@ -239,42 +389,83 @@ Edge::flow_t Edge::residual_flow() {
 
 /*==========================================================================*/
 
-void Graph::read_from_user() {
+Graph::Graph(const size_t& left_size, const size_t& right_size)
+    : left_part_size(left_size)
+    , right_part_size(right_size) {
 
-    size_t n_vertices = 0,
-           n_edges    = 0;
+    incidence.resize(left_size + right_size + 2);
+}
 
-    if (2 != scanf("%lu %lu", &n_vertices, &n_edges)) {
-        throw std::runtime_error("couldn't read graph size");
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+void Graph::set_sink(const vector<Edge::flow_t> &sink_cap) {
+
+    if (sink_cap.size() != right_part_size) {
+        throw std::runtime_error("setting sink of different size");
     }
 
-    edges.reserve(n_edges * 2);
-    incidence.resize(n_vertices);
+    const int sink = 1 + left_part_size + right_part_size;
 
-    for (size_t i = 0; i < n_edges; ++i) {
-
-        int from_vertice = 0, 
-            to_vertice   = 0;
-
-        Edge::flow_t edge_capacity = 0;
-
-        if (3 != scanf("%d %d %ld", &from_vertice,
-                                    &to_vertice,
-                                    &edge_capacity)) {
-            throw std::runtime_error("couldn't read an edge");
+    for (size_t v = 1; v <= right_part_size; ++v) {
+       
+        if (sink_cap[v - 1] == 0) {
+            continue;
         }
 
-        --from_vertice; --to_vertice;
-
-        /* main edge */
-        insert_edge(from_vertice, to_vertice, edge_capacity);
-        
-        /* back edge */
-        insert_edge(to_vertice, from_vertice, 0LL);
+        insert_edge(v + left_part_size, sink, sink_cap[v - 1]);
+        insert_edge(sink, v + left_part_size, 0LL);
     }
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+Edge::flow_t Graph::min_sink() {
+    
+    Edge::flow_t min_sink = Edge::INF_FLOW;
+
+    const int sink = 1 + left_part_size + right_part_size;
+
+    for (const auto& e : incidence[sink]) {
+
+        min_sink = std::min(min_sink, edges[e ^ 1].flow); 
+
+    }
+
+    return min_sink;
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+void Graph::set_source(const vector<Edge::flow_t> &source_cap) {
+
+    if (source_cap.size() != left_part_size) {
+        throw std::runtime_error("setting source of different size");
+    }
+
+    const int source = 0;
+
+    for (size_t v = 1; v <= left_part_size; ++v) {
+        
+        if (source_cap[v - 1] == 0) {
+            continue;
+        }
+
+        insert_edge(source, v, source_cap[v - 1]);
+        insert_edge(v, source, 0LL);
+    }
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+void Graph::connect(const int &left_vertice, const int &right_vertice,
+                    const Edge::flow_t& capacity) {
+
+    insert_edge(left_vertice, left_part_size + right_vertice, capacity); 
+    insert_edge(left_part_size + right_vertice, left_vertice, 0LL); 
+
+}
+
+/*==========================================================================*/
 
 void Graph::insert_edge(const int &from, const int &to, 
                         const Edge::flow_t& capacity) {
@@ -287,6 +478,14 @@ void Graph::insert_edge(const int &from, const int &to,
 
 size_t Graph::n_vertices() {
     return incidence.size();
+}
+
+size_t Graph::left_size() {
+    return left_part_size;
+}
+
+size_t Graph::right_size() {
+    return right_part_size;
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -307,7 +506,7 @@ void Graph::dump() {
 
         for (const auto& e : incidence[v]) {
 
-            printf("\t\tedge %d: %d --(%ld/%ld)--> %d\n",
+            printf("\t\tedge %d: %d --(%lld/%lld)--> %d\n",
                    e + 1, edges[e].from + 1, edges[e].flow,
                    edges[e].capacity, edges[e].to + 1);
         }

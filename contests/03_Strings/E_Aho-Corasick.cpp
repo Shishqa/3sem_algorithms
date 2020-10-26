@@ -8,10 +8,14 @@
 
 /*##########################################################################*/
 
-#include <cstdio>
+#include <fstream>
 #include <iostream>
+
 #include <set>
-#include <string>
+#include <unordered_set>
+#include <unordered_map>
+
+#include <cstring>
 #include <string_view>
 
 #include <queue>
@@ -21,49 +25,64 @@
 
 class Trie {
 public:
+
+    using Char = char;
+    using String = std::string_view;
    
-    Trie();
+    Trie() {
+        root = new Node(0, nullptr);
+    }
 
-    Trie(const std::vector<std::string_view>& vocabulary);
-
-    ~Trie() = default;
+    ~Trie() {
+        delete root;
+    }
 
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
     void add(const std::string_view& str);
 
-    void dump();
+    void dump(const char* filename);
 
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    std::vector<std::set<size_t>> aho_corasick(const String& str);
 
 private:
 
     struct Node {
 
-        Node(const char& last_char) 
+        Node(const Char& last_char, Node* parent) 
             : last_char(last_char)
-            , is_terminal(false) {}
+            , is_terminal(false) 
+            , parent(parent) {}
 
         ~Node();
 
-        struct comparator {
-            bool operator()(Node* const& a, Node* const& b) const {
-                return a->last_char < b->last_char;
-            }
-        };
-        std::set<Node*, comparator> go; 
+        std::unordered_map<Char, Node*> children; 
+        std::unordered_map<Char, Node*> go;
 
-        char last_char;
         bool is_terminal;
-        std::vector<size_t> related_patterns;
+        
+        Node* parent = nullptr;
+        Node* suffix_link = nullptr;
+        Node* short_suffix_link = nullptr;
+        
+        Char last_char;
+        std::unordered_set<size_t> related_patterns;
     };
 
-    Node root;
+    Node* get_suff_link(Node* node);
+    
+    Node* get_link(Node* node, const Char& c);
+
+    Node* get_up(Node* node);
+
+    /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    Node* root = nullptr;
+
+    std::vector<String> vocabulary;
 };
-
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-void aho_corasick(const std::string_view& str, const Trie& vocab);
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -80,105 +99,198 @@ int main() {
 
     char vocab_buffer[MAX_STRING_LENGTH]  = "";
 
-    std::vector<std::string_view> vocab;
-    vocab.reserve(vocab_size);
+    Trie vocabulary;
 
     char* curr_word = vocab_buffer;
     for (size_t i = 0; i < vocab_size; ++i) {
+
         std::cin.getline(curr_word, 
                 vocab_buffer + sizeof(vocab_buffer) - curr_word - 1);
+        std::string_view word(curr_word, strlen(curr_word)); 
 
-        vocab.emplace_back(curr_word);
+        vocabulary.add(word);
 
-        curr_word += vocab[i].size();
+        curr_word += word.size();
     }
 
-    Trie trie(vocab);
+    std::vector<std::set<size_t>> oc_str = 
+        vocabulary.aho_corasick(std::string_view(string, strnlen(string, sizeof(string))));
 
-    trie.dump();
+    //vocabulary.dump(".dump-aho");
+
+    for (const auto& oc : oc_str) {
+        std::cout << oc.size() << " ";
+        for (const auto& elem : oc) {
+            std::cout << elem << " ";
+        }
+        std::cout << std::endl;
+    }
 
     return 0;
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-Trie::Trie(const std::vector<std::string_view>& vocabulary)
-        : root(0) {
+std::vector<std::set<size_t>> Trie::aho_corasick(const String& str) {
 
-    for (const auto& elem : vocabulary) {
-        add(elem);
+    std::vector<std::set<size_t>> occurrences(vocabulary.size()); 
+
+    Node* curr_node = root;
+
+    for (size_t i = 0; i < str.size(); ++i) {
+
+        curr_node = get_link(curr_node, str[i]);
+
+        Node* check = curr_node;
+        while (root != check) {
+            
+            if (check->is_terminal) {
+                for (const auto& p : check->related_patterns) {
+                    occurrences[p].insert(i + 2 - vocabulary[p].size());
+                }
+            }
+
+            check = get_up(check);
+        }
     }
+
+    return occurrences;
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-Trie::Trie()
-        : root(0) {}
+Trie::Node* Trie::get_link(Node* node, const Char& c) {
 
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+    if (!node->go.count(c)) {
+        if (node->children.count(c)) {
+        
+            node->go[c] = node->children[c];
+    
+        } else if (root == node) {
 
-void Trie::add(const std::string_view& str) {
+            node->go[c] = root;
+    
+        } else {
 
-    //std::cout << "add " << str << "\n";
-
-    Node* curr_node = &root;
-
-    for (const auto& character : str) {
-        bool found_way = false;
-        for (auto& node : curr_node->go) {
-            if (character == node->last_char) {
-                curr_node = node;
-                found_way = true;
-                break;
-            }
-        }
-        if (!found_way) {
-            auto new_node = new Node(character);
-            curr_node->go.insert(new_node);
-            curr_node = new_node;
+            node->go[c] = get_link(get_suff_link(node), c);
         }
     }
 
+    return node->go[c];
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+Trie::Node* Trie::get_suff_link(Node* node) {
+
+    if (!node->suffix_link) {
+        if (root == node || root == node->parent) {
+            
+            node->suffix_link = root;
+        
+        } else {
+
+            node->suffix_link = 
+                get_link(get_suff_link(node->parent), node->last_char);
+        }
+    }
+
+    return node->suffix_link;
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+Trie::Node* Trie::get_up(Node* node) {
+
+    if (!node->short_suffix_link) {
+        if (get_suff_link(node)->is_terminal) {
+        
+            node->short_suffix_link = get_suff_link(node);
+        
+        } else if (root == get_suff_link(node)) {
+
+            node->short_suffix_link = root;
+            
+        } else {
+
+            node->short_suffix_link = get_up(get_suff_link(node));
+        }
+    }
+
+    return node->short_suffix_link;
+}
+
+/*==========================================================================*/
+
+void Trie::add(const String& str) {
+
+    Node* curr_node = root;
+
+    for (const auto& character : str) {
+       
+        if (!curr_node->children.count(character)) {
+
+            auto new_node = new Node(character, curr_node);
+            curr_node->children[character] = new_node;
+        }
+
+        curr_node = curr_node->children[character];
+    }
+
     curr_node->is_terminal = true;
+    curr_node->related_patterns.insert(vocabulary.size());
+
+    vocabulary.emplace_back(str);
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 Trie::Node::~Node() {
-    for (auto& node : go) {
-        delete node;
+    for (auto& node : children) {
+        delete node.second;
     }
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-void Trie::dump() {
+void Trie::dump(const char* filename) {
 
-    FILE* file = stdout;
+    std::ofstream file;
+    file.open(filename);
 
-    fprintf(file, "digraph G {\n");
+    file << "digraph G {\n";
 
     std::queue<Node*> to_visit;
-    to_visit.push(&root);
+    to_visit.push(root);
 
     while (!to_visit.empty()) {
 
         Node* target = to_visit.front();
         to_visit.pop();
 
-        fprintf(file, "\tnode%p [label=\"\", color=\"%s\"];\n",
-                target, (target->is_terminal ? "red" : "black"));
+        file << "\tnode" << target << " [label=\"";
+        if (target->is_terminal) {
+            file << vocabulary[*target->related_patterns.begin()];
+        }
+        file << "\", color=\"" << (target->is_terminal ? "red" : "black") << "\"];\n";
 
-        for (auto& node : target->go) {
-            
-            fprintf(file, "\tnode%p -> node%p [label=\"%c\"];\n",
-                    target, node, node->last_char);
+        for (auto& node : target->children) {
+           
+            file << "\tnode" << target << " -> " << "node" << node.second <<
+                    " [label=\"" << node.second->last_char << "\"];\n";
 
-            to_visit.push(node);
+            to_visit.push(node.second);
+        }
+
+        if (target->suffix_link) {
+            file << "\tnode" << target << " -> " << "node" << target->suffix_link <<
+                    " [style=\"dotted\"];\n";
         }
     }
 
-    fprintf(file, "\n}\n");
+    file << "\n}\n";
+
+    file.close();
 }
 
 /*==========================================================================*/

@@ -4,32 +4,63 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <utility>
 #include <vector>
+#include <map>
 #include <string_view>
-#include <stack>
+#include <algorithm>
 
-/*============================================================================*/
+/*############################################################################*/
 
-/* 2 sem -- Histogram problem */
-
-typedef unsigned long long uint_ll;
-
-struct MaxArea {
-    size_t idx;
-    uint_ll area;
+#include <cstdio>
+#include <vector>
+ 
+template <class Key>
+class SparseTable {
+ 
+    typedef Key key_t;
+ 
+public:
+ 
+    key_t get_max(const size_t& l_idx, const size_t& r_idx);
+ 
+    explicit SparseTable(const std::vector<key_t>& init_data);
+ 
+    SparseTable() = delete;
+ 
+    SparseTable(const SparseTable& other) = delete;
+ 
+    ~SparseTable();
+ 
+private:
+ 
+    void fill_table(const std::vector<key_t>& init_data);
+ 
+    key_t** table;
+ 
+    const size_t size;
+ 
+    size_t height;
+    size_t* log2;
+    size_t* pow2;
 };
+ 
+struct Key {
+ 
+    size_t idx;
+    int value;
+ 
+    Key() = default;
+ 
+    Key(const Key& other) = default;
+ 
+    ~Key() = default;
+};
+ 
+bool operator<(const Key& key1, const Key& key2);
 
-void set_border(std::stack <std::pair <size_t, uint_ll>>& stk,
-				uint_ll curr_height, size_t curr_index, size_t index_to_set,
-				std::vector <int>& possible_border);
-
-void fill_nil_borders(std::stack <std::pair <size_t, uint_ll>>& stk,
-					  size_t nil_value, std::vector <int>& possible_border);
-
-MaxArea max_area(const std::vector<uint_ll>& arr);
-
-/*============================================================================*/
+/*############################################################################*/
 
 class SuffixArray {
 public:
@@ -39,7 +70,10 @@ public:
         int rank[2];
     };
 
-    using CommonPrefix = uint_ll;
+    struct CommonPrefix {
+        int index;
+        int len;
+    };
 
     explicit SuffixArray(const char* string, const size_t& len);
 
@@ -74,36 +108,33 @@ private:
 
 int main() {
    
-    size_t str_len = 0;
-    scanf("%lu %*d", &str_len);
+    char buffer[100001] = "";
+    scanf("%s", buffer);
 
-    int value = 0;
-    char buffer[150001] = "";
-    for (size_t i = 0; i < str_len; ++i) {
-        scanf("%d", &value); 
-        buffer[i] = ('0' - 1) + value;
-    }
+    size_t str_len = strnlen(buffer, sizeof(buffer));
 
     SuffixArray suff_arr(buffer, str_len); 
 
-    MaxArea max_ar = max_area(suff_arr.LCP());
+    printf("sorted:\n");
+    for (auto& suff : suff_arr.array()) {
+        printf("%s - {%d, %d}\n", buffer + suff.index, 
+                                  suff.rank[0], 
+                                  suff.rank[1]);
+    }
+    printf("\n\n");
 
-    if (max_ar.area < str_len) {
+    printf("lcp:\n");
+    for (auto& cp : suff_arr.LCP()) {
+        printf("%d - %d\n", cp.index, cp.len);
+    }
+    printf("\n\n");
 
-        printf("%lu\n%lu\n", str_len, str_len);
-        for (size_t i = 0; i < str_len; ++i) {
-            printf("%d ", buffer[i] + 1 - '0');
-        }
-        printf("\n");
-
-        return 0;
+    std::vector<Key> table_data(suff_arr.array().size());
+    for (size_t i = 0; i < table_data.size(); ++i) {
+        table_data[i].value = suff_arr.LCP()[i].len;
+        table_data[i].idx = i;
     }
 
-    printf("%llu\n%llu\n", max_ar.area, suff_arr.LCP()[max_ar.idx]);
-    for (size_t i = 0; i < suff_arr.LCP()[max_ar.idx]; ++i) {
-        printf("%d ", *(buffer + suff_arr[max_ar.idx].index + i) + 1 - '0');
-    }
-    printf("\n");
 
     return 0;
 }
@@ -145,8 +176,8 @@ void SuffixArray::build_array() {
 
     for (size_t i = 0; i < arr.size(); ++i) {
         arr[i].index = i;
-        arr[i].rank[0] = string[i] - '0' + 1;
-        arr[i].rank[1] = (i + 1 < arr.size() ? string[i + 1] - '0' + 1 : 0); 
+        arr[i].rank[0] = string[i] - 'a' + 1;
+        arr[i].rank[1] = (i + 1 < arr.size() ? string[i + 1] - 'a' + 1 : 0); 
     }
 
     sort_suffixes();
@@ -210,7 +241,7 @@ void SuffixArray::count_sort(std::vector<Suffix>& input,
                              std::vector<Suffix>& output,
                              const int& rk) {
 
-    std::vector<int> cnt(std::max(input.size() + 10, static_cast<size_t>(11)), 0);
+    std::vector<int> cnt(std::max(input.size() + 10, static_cast<size_t>(('z' - 'a') + 10)), 0);
     output.resize(input.size());
 
     for (size_t i = 0; i < input.size(); ++i) {
@@ -248,10 +279,6 @@ void SuffixArray::build_LCP() {
         return;
     }
 
-    if (!arr_built) {
-        build_array();   
-    }
-
     std::vector<int> where(arr.size());
     for (size_t i = 0; i < arr.size(); ++i) {
         where[arr[i].index] = i;
@@ -266,7 +293,7 @@ void SuffixArray::build_LCP() {
 
         if (where[i] == 0) {
          
-            lcp[0] = 0;
+            lcp[0] = {arr[0].index, 0};
             k = 0;
             continue;
 
@@ -279,70 +306,90 @@ void SuffixArray::build_LCP() {
                 ++k;
             }
 
-            lcp[where[i]] = k;
+            lcp[where[i]] = {i, k};
         }
     }
 
     lcp_built = true;
 }
+/*############################################################################*/
 
-/*============================================================================*/
-
-void set_border(std::stack <std::pair <size_t, uint_ll>>& stk,
-				uint_ll curr_height, size_t curr_index, size_t index_to_set,
-				std::vector <int>& possible_border)
-{
-	while (!stk.empty() && stk.top().second > curr_height)
-	{
-		possible_border[stk.top().first] = index_to_set;
-		stk.pop();
-	}
-	stk.push(std::make_pair(curr_index, curr_height));
+bool operator<(const Key& key1, const Key& key2) {
+ 
+    if (key1.value == key2.value) {
+ 
+        return key1.idx < key2.idx;
+ 
+    }
+ 
+    return key1.value < key2.value;
 }
  
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-void fill_nil_borders(std::stack <std::pair <size_t, uint_ll>>& stk,
-					  size_t nil_value, std::vector <int>& possible_border)
-{
-	while (!stk.empty())
-	{
-		possible_border[stk.top().first] = nil_value;
-		stk.pop();
-	}
-}
-
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-
-MaxArea max_area(const std::vector<uint_ll>& arr)
-{
-	std::stack <std::pair <size_t, uint_ll>> stk_lefts  = {};
-	std::stack <std::pair <size_t, uint_ll>> stk_rights = {};
+template <class Key>
+SparseTable<Key>::SparseTable(const std::vector<key_t>& init_data) :
+        size(init_data.size()),
+        height(0) {
  
-	std::vector <int> right_possible_border(arr.size());
-	std::vector <int> left_possible_border(arr.size());
+    log2 = new size_t[size + 1];
  
-	for (size_t i = 0, j = arr.size() - 1; i < arr.size(); ++i, --j)
-	{
-		set_border(stk_lefts,  arr[i], i, i - 1,          right_possible_border);
-		set_border(stk_rights, arr[j], j, arr.size() - i, left_possible_border);
-	}
+    for (size_t i = 1, pow = 1; i <= size; ++i) {
  
-	fill_nil_borders(stk_lefts,  arr.size() - 1, right_possible_border);
-	fill_nil_borders(stk_rights, 0,              left_possible_border);
- 
-    MaxArea max_area = {0, 0};
-	uint_ll curr_area = 0;
- 
-	for (size_t i = 0; i < arr.size(); ++i)
-	{
-		curr_area = arr[i] * (right_possible_border[i] - left_possible_border[i] + 2);
-        if (curr_area > max_area.area) {
-            max_area = {i, curr_area};
+        if (i == pow) {
+            pow <<= 1;
+            ++height;
         }
-	}
  
-	return max_area;
+        log2[i] = height - 1;
+    }
+ 
+    pow2 = new size_t[height];
+ 
+    for (size_t i = 0, pow = 1; i < height; ++i, pow <<= 1) {
+        pow2[i] = pow;
+    }
+ 
+    table = new key_t* [height];
+ 
+    for (size_t i = 0; i < height; ++i) {
+        table[i] = new key_t[size];
+    }
+ 
+    fill_table(init_data);
+}
+ 
+template <class Key>
+void SparseTable<Key>::fill_table(const std::vector<key_t>& init_data) {
+ 
+    for (size_t j = 0; j < size; ++j) {
+        table[0][j] = init_data[j];
+    }
+ 
+    for (size_t step = 1, i = 1; i < height; ++i, step <<= 1) {
+        for (size_t j = 0; j + 2 * step <= size; ++j) {
+ 
+            table[i][j] = std::max(table[i - 1][j], table[i - 1][j + step]);
+ 
+        }
+    }
+}
+ 
+template <class Key>
+Key SparseTable<Key>::get_max(const size_t& l_idx, const size_t& r_idx) {
+ 
+    auto degree = log2[r_idx - l_idx + 1];
+    return std::max(table[degree][l_idx], table[degree][r_idx - pow2[degree] + 1]);
+}
+ 
+template <class Key>
+SparseTable<Key>::~SparseTable() {
+ 
+    for (size_t i = 0; i < height; ++i) {
+        delete[] table[i];
+    }
+ 
+    delete[] table;
+    delete[] log2;
+    delete[] pow2;
 }
 
 /*============================================================================*/

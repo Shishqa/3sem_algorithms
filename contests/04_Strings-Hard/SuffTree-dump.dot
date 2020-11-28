@@ -1,0 +1,127 @@
+digraph SuffixTree {
+subgraph cluster_0 {
+	graph [color=black; label="Iteration 0 : "];
+	node [shape=point];
+	"node00x607000000020" [color=violet, label=""];
+	"node00x607000000020" -> "node00x607000000020" [color=red];
+	"lastPending0" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending0" -> "node00x607000000020" [style=dotted];
+}
+subgraph cluster_1 {
+	graph [color=black; label="Iteration 1 : a"];
+	node [shape=point];
+	"node10x607000000020" [color=violet, label=""];
+	"node10x607000000020" -> "node10x607000000020" [color=red];
+	"node10x607000000020" -> "node10x607000000090" [label="atari$"];
+	"node10x607000000090" [color=black, label=""];
+	"node10x607000000090" -> "node10x607000000090" [color=red];
+	"lastPending1" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending1" -> "node10x607000000020" [style=dotted];
+}
+subgraph cluster_2 {
+	graph [color=black; label="Iteration 2 : at"];
+	node [shape=point];
+	"node20x607000000020" [color=violet, label=""];
+	"node20x607000000020" -> "node20x607000000020" [color=red];
+	"node20x607000000020" -> "node20x607000000100" [label="tari$"];
+	"node20x607000000020" -> "node20x607000000090" [label="atari$"];
+	"node20x607000000100" [color=black, label=""];
+	"node20x607000000100" -> "node20x607000000100" [color=red];
+	"node20x607000000090" [color=black, label=""];
+	"node20x607000000090" -> "node20x607000000090" [color=red];
+	"lastPending2" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending2" -> "node20x607000000020" [style=dotted];
+}
+subgraph cluster_3 {
+	graph [color=black; label="Iteration 3 : ata"];
+	node [shape=point];
+	"node30x607000000020" [color=violet, label=""];
+	"node30x607000000020" -> "node30x607000000020" [color=red];
+	"node30x607000000020" -> "node30x607000000100" [label="tari$"];
+	"node30x607000000020" -> "node30x607000000090" [label="atari$"];
+	"node30x607000000100" [color=black, label=""];
+	"node30x607000000100" -> "node30x607000000100" [color=red];
+	"node30x607000000090" [color=black, label=""];
+	"node30x607000000090" -> "node30x607000000090" [color=red];
+	"lastPending3" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending3" -> "node30x607000000090" [style=dotted];
+}
+subgraph cluster_4 {
+	graph [color=black; label="Iteration 4 : atar"];
+	node [shape=point];
+	"node40x607000000020" [color=violet, label=""];
+	"node40x607000000020" -> "node40x607000000020" [color=red];
+	"node40x607000000020" -> "node40x607000000250" [label="ri$"];
+	"node40x607000000020" -> "node40x607000000100" [label="tari$"];
+	"node40x607000000020" -> "node40x607000000170" [label="a"];
+	"node40x607000000250" [color=black, label=""];
+	"node40x607000000250" -> "node40x607000000250" [color=red];
+	"node40x607000000100" [color=black, label=""];
+	"node40x607000000100" -> "node40x607000000100" [color=red];
+	"node40x607000000170" [color=black, label=""];
+	"node40x607000000170" -> "node40x607000000020" [color=red];
+	"node40x607000000170" -> "node40x6070000001e0" [label="ri$"];
+	"node40x607000000170" -> "node40x607000000090" [label="tari$"];
+	"node40x6070000001e0" [color=black, label=""];
+	"node40x6070000001e0" -> "node40x6070000001e0" [color=red];
+	"node40x607000000090" [color=black, label=""];
+	"node40x607000000090" -> "node40x607000000090" [color=red];
+	"lastPending4" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending4" -> "node40x607000000020" [style=dotted];
+}
+subgraph cluster_5 {
+	graph [color=black; label="Iteration 5 : atari"];
+	node [shape=point];
+	"node50x607000000020" [color=violet, label=""];
+	"node50x607000000020" -> "node50x607000000020" [color=red];
+	"node50x607000000020" -> "node50x6070000002c0" [label="i$"];
+	"node50x607000000020" -> "node50x607000000250" [label="ri$"];
+	"node50x607000000020" -> "node50x607000000100" [label="tari$"];
+	"node50x607000000020" -> "node50x607000000170" [label="a"];
+	"node50x6070000002c0" [color=black, label=""];
+	"node50x6070000002c0" -> "node50x6070000002c0" [color=red];
+	"node50x607000000250" [color=black, label=""];
+	"node50x607000000250" -> "node50x607000000250" [color=red];
+	"node50x607000000100" [color=black, label=""];
+	"node50x607000000100" -> "node50x607000000100" [color=red];
+	"node50x607000000170" [color=black, label=""];
+	"node50x607000000170" -> "node50x607000000020" [color=red];
+	"node50x607000000170" -> "node50x6070000001e0" [label="ri$"];
+	"node50x607000000170" -> "node50x607000000090" [label="tari$"];
+	"node50x6070000001e0" [color=black, label=""];
+	"node50x6070000001e0" -> "node50x6070000001e0" [color=red];
+	"node50x607000000090" [color=black, label=""];
+	"node50x607000000090" -> "node50x607000000090" [color=red];
+	"lastPending5" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending5" -> "node50x607000000020" [style=dotted];
+}
+subgraph cluster_6 {
+	graph [color=black; label="Iteration 6 : atari$"];
+	node [shape=point];
+	"node60x607000000020" [color=violet, label=""];
+	"node60x607000000020" -> "node60x607000000020" [color=red];
+	"node60x607000000020" -> "node60x6070000002c0" [label="i$"];
+	"node60x607000000020" -> "node60x607000000330" [label="$"];
+	"node60x607000000020" -> "node60x607000000250" [label="ri$"];
+	"node60x607000000020" -> "node60x607000000100" [label="tari$"];
+	"node60x607000000020" -> "node60x607000000170" [label="a"];
+	"node60x6070000002c0" [color=black, label=""];
+	"node60x6070000002c0" -> "node60x6070000002c0" [color=red];
+	"node60x607000000330" [color=black, label=""];
+	"node60x607000000330" -> "node60x607000000330" [color=red];
+	"node60x607000000250" [color=black, label=""];
+	"node60x607000000250" -> "node60x607000000250" [color=red];
+	"node60x607000000100" [color=black, label=""];
+	"node60x607000000100" -> "node60x607000000100" [color=red];
+	"node60x607000000170" [color=black, label=""];
+	"node60x607000000170" -> "node60x607000000020" [color=red];
+	"node60x607000000170" -> "node60x6070000001e0" [label="ri$"];
+	"node60x607000000170" -> "node60x607000000090" [label="tari$"];
+	"node60x6070000001e0" [color=black, label=""];
+	"node60x6070000001e0" -> "node60x6070000001e0" [color=red];
+	"node60x607000000090" [color=black, label=""];
+	"node60x607000000090" -> "node60x607000000090" [color=red];
+	"lastPending6" [shape=box,color=yellow,label="lastPending: idx=0"];
+	"lastPending6" -> "node60x607000000020" [style=dotted];
+}
+}

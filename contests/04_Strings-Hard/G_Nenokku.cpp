@@ -3,6 +3,8 @@
 
 #include <cassert>
 
+#include <cstring>
+#include <cctype>
 #include <cstddef>
 #include <cstdio>
 #include <queue>
@@ -45,7 +47,7 @@ public:
         int idx;
     };
 
-    explicit SuffixTree(const Char* str);
+    explicit SuffixTree(const Char* str, size_t max_str_size);
 
     void widen(size_t len);
 
@@ -56,6 +58,8 @@ public:
     ~SuffixTree();
 
 private:
+
+    Char ch(int pos);
 
     void dump(int iter);
 
@@ -81,6 +85,7 @@ private:
 
     const char* buf;
     size_t buf_len;
+    size_t max_buf_len;
     /*######################################*/
 
     FILE* DUMP_STREAM;
@@ -90,14 +95,44 @@ private:
 
 int main(int argc, char *argv[]) {
 
-    char buffer[500000] = "";
-    int string_len = 0;
-    scanf("%s%n", buffer, &string_len);
+    char story_buffer[100000] = "";
+    int story_len = 0;
 
-    buffer[string_len] = '$';
+    char question_buffer[100000] = "";
+    int question_len = 0;
 
-    SuffixTree tree(buffer); 
-    tree.widen(string_len + 1);
+    SuffixTree tree(story_buffer, 1000000);
+
+    char op = 0;
+    while (EOF != scanf("%c", &op)) {
+
+        switch (op) {
+            case 'A': 
+            {
+                scanf("%s", story_buffer + story_len);
+                
+                int delta = strlen(story_buffer + story_len);
+                story_len += delta;
+
+                tree.widen(delta);
+            }
+            break;
+
+            case '?':
+            {
+                scanf("%s", question_buffer);
+                question_len = strlen(question_buffer);
+
+                printf("%s\n", (tree.has(question_buffer, question_len) ? "YES" : "NO"));
+            }
+            break;
+
+            default:
+                printf("unknown op: %c(%d)\n", op, op);
+        }
+
+        scanf("\n");
+    }
 
     return 0;
 }
@@ -110,12 +145,12 @@ bool SuffixTree::has(const Char* str, size_t len) {
 
     for (size_t i = 0; i < len; ++i) {
 
-        if (!canWalk(finder, str[i])) {
-            printf("failed at len %lu\n", i);
+        if (!canWalk(finder, tolower(str[i]))) {
+            //printf("failed at len %lu\n", i);
             return false;
         }
    
-        walk(finder, str[i]);
+        walk(finder, tolower(str[i]));
     }
 
     return true;
@@ -130,12 +165,12 @@ bool SuffixTree::isEdgeExtendable(const SuffTerminal& terminal)
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-bool SuffixTree::canWalk(const SuffTerminal& terminal, Char ch) 
+bool SuffixTree::canWalk(const SuffTerminal& terminal, Char c) 
 {    
     if (isEdgeExtendable(terminal)) {    
-        return buf[terminal.idx + 1] == ch;
+        return ch(terminal.idx + 1) == tolower(c);
     } 
-    return terminal.node->children.count(ch);
+    return terminal.node->children.count(tolower(c));
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -147,7 +182,7 @@ void SuffixTree::walk(SuffTerminal& terminal, Char ch)
     if (isEdgeExtendable(terminal)) {
         ++terminal.idx; 
     } else {
-        terminal.node = terminal.node->children[ch];
+        terminal.node = terminal.node->children[tolower(ch)];
         terminal.idx  = terminal.node->edge_l;
     }
 }
@@ -191,7 +226,7 @@ SuffixTree::SuffTerminal SuffixTree::getLink(const SuffTerminal& terminal)
     int num_char_left = terminal.idx - read_from + 1;
     while (num_char_left) {
     
-        link.node = link.node->children[buf[read_from]];
+        link.node = link.node->children[ch(read_from)];
 
         if (link.node->edgeLen() >= num_char_left) {
             link.idx = link.node->edge_l + num_char_left - 1; 
@@ -210,14 +245,14 @@ SuffixTree::SuffTerminal SuffixTree::getLink(const SuffTerminal& terminal)
 
 void SuffixTree::extend(int pos) 
 {
-    while (!canWalk(lastPending, buf[pos])) {
+    while (!canWalk(lastPending, ch(pos))) {
 
-        Node* list = new Node(nullptr, pos, buf_len - 1);
+        Node* list = new Node(nullptr, pos, max_buf_len - 1);
 
         if (isEdgeExtendable(lastPending)) {
 
             Node* split_node = split(lastPending.node, lastPending.idx);
-            split_node->attach(list, buf[pos]);
+            split_node->attach(list, ch(pos));
 
             lastPending.node = split_node;
 
@@ -229,7 +264,7 @@ void SuffixTree::extend(int pos)
 
         } else {
 
-            lastPending.node->attach(list, buf[pos]);
+            lastPending.node->attach(list, ch(pos));
 
             if (waitingForLink) {
                 waitingForLink->suff_link = lastPending.node;
@@ -261,7 +296,7 @@ void SuffixTree::extend(int pos)
         waitingForLink = nullptr;
     }
 
-    walk(lastPending, buf[pos]);
+    walk(lastPending, ch(pos));
 }
 
 /*============================================================================*/
@@ -279,8 +314,8 @@ SuffixTree::Node* SuffixTree::split(Node* node, int idx) {
 
     auto new_node = new Node(node->parent, node->edge_l, idx); 
 
-    new_node->children[buf[idx + 1]] = node;
-    node->parent->children[buf[node->edge_l]] = new_node;
+    new_node->children[ch(idx + 1)] = node;
+    node->parent->children[ch(node->edge_l)] = new_node;
 
     node->edge_l = idx + 1;
     node->parent = new_node;
@@ -290,18 +325,25 @@ SuffixTree::Node* SuffixTree::split(Node* node, int idx) {
 
 /*############################################################################*/
 
-SuffixTree::SuffixTree(const Char* str)
+SuffixTree::SuffixTree(const Char* str, size_t max_str_size)
     : root(nullptr)
     , lastPending({})
     , waitingForLink(nullptr)
     , buf(str)
-    , buf_len(0) {
+    , buf_len(0)
+    , max_buf_len(max_str_size) {
 
     root = new Node(nullptr, -1, -1); 
     lastPending = {root, -1};
 
-    DUMP_STREAM = fopen("SuffTree-dump.dot", "w");
-    fprintf(DUMP_STREAM, "digraph SuffixTree {\n");
+    //DUMP_STREAM = fopen("SuffTree-dump.dot", "w");
+    //fprintf(DUMP_STREAM, "digraph SuffixTree {\n");
+}
+
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+SuffixTree::Char SuffixTree::ch(int pos) {
+    return tolower(buf[pos]);
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -312,7 +354,7 @@ void SuffixTree::widen(size_t len) {
 
     for (int i = buf_len - len; i < buf_len; ++i) {
         extend(i);
-        dump(i);
+        //dump(i);
     }
 }
 
@@ -320,8 +362,10 @@ void SuffixTree::widen(size_t len) {
 
 SuffixTree::~SuffixTree() {
 
-    fprintf(DUMP_STREAM, "}\n");
-    fclose(DUMP_STREAM);
+    //dump(buf_len);
+
+    //fprintf(DUMP_STREAM, "}\n");
+    //fclose(DUMP_STREAM);
 
     delete root;
 }

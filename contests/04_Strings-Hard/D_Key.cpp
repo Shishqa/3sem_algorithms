@@ -1,6 +1,9 @@
 /* (c) Shishqa, 2020 */
 /*============================================================================*/
 
+#include <cassert>
+
+#include <stack>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -11,68 +14,25 @@
 #include <string_view>
 #include <algorithm>
 
-/*############################################################################*/
+#ifdef VERBOSE
+#define V( smth ) smth
+#else
+#define V( smth )
+#endif
 
-#include <cstdio>
-#include <vector>
- 
-template <class Key>
-class SparseTable {
- 
-    typedef Key key_t;
- 
-public:
- 
-    key_t get_max(const size_t& l_idx, const size_t& r_idx);
- 
-    explicit SparseTable(const std::vector<key_t>& init_data);
- 
-    SparseTable() = delete;
- 
-    SparseTable(const SparseTable& other) = delete;
- 
-    ~SparseTable();
- 
-private:
- 
-    void fill_table(const std::vector<key_t>& init_data);
- 
-    key_t** table;
- 
-    const size_t size;
- 
-    size_t height;
-    size_t* log2;
-    size_t* pow2;
-};
- 
-struct Key {
- 
-    size_t idx;
-    int value;
- 
-    Key() = default;
- 
-    Key(const Key& other) = default;
- 
-    ~Key() = default;
-};
- 
-bool operator<(const Key& key1, const Key& key2);
-
-/*############################################################################*/
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 class SuffixArray {
 public:
 
     struct Suffix {
-        int index;
-        int rank[2];
+        long long index;
+        long long rank[2];
     };
 
     struct CommonPrefix {
-        int index;
-        int len;
+        long long index;
+        long long len;
     };
 
     explicit SuffixArray(const char* string, const size_t& len);
@@ -95,7 +55,7 @@ private:
 
     static void count_sort(std::vector<Suffix>& input, 
                            std::vector<Suffix>& output,
-                           const int& rk);
+                           const long long& rk);
 
     bool arr_built;
     std::vector<Suffix> arr;
@@ -108,16 +68,17 @@ private:
 
 int main() {
    
-    char buffer[100001] = "";
+    char buffer[700005] = "";
     scanf("%s", buffer);
 
-    size_t str_len = strnlen(buffer, sizeof(buffer));
+    long long str_len = strnlen(buffer, sizeof(buffer));
 
     SuffixArray suff_arr(buffer, str_len); 
 
+    V(
     printf("sorted:\n");
     for (auto& suff : suff_arr.array()) {
-        printf("%s - {%d, %d}\n", buffer + suff.index, 
+        printf("%s - {%lld, %lld}\n", buffer + suff.index, 
                                   suff.rank[0], 
                                   suff.rank[1]);
     }
@@ -125,16 +86,138 @@ int main() {
 
     printf("lcp:\n");
     for (auto& cp : suff_arr.LCP()) {
-        printf("%d - %d\n", cp.index, cp.len);
+        printf("%lld - %lld\n", cp.index, cp.len);
     }
     printf("\n\n");
+    )
 
-    std::vector<Key> table_data(suff_arr.array().size());
-    for (size_t i = 0; i < table_data.size(); ++i) {
-        table_data[i].value = suff_arr.LCP()[i].len;
-        table_data[i].idx = i;
+    long long ans = str_len;
+
+    std::stack<long long> last;
+
+    std::vector<long long> L(suff_arr.LCP().size(), 10000000LL);
+    std::vector<long long> R(suff_arr.LCP().size(), -10000000LL);
+    
+    long long lcp = suff_arr.LCP()[0].len;
+
+    for (size_t i = 1; i < suff_arr.LCP().size(); ++i) {
+
+        V(
+        printf("================================\n");
+        printf("lcp=%lld\n", lcp);
+
+        printf("L: ");
+        for (long long k = 0; k <= lcp; ++k) {
+            printf("%lld ", L[k]);
+        }
+        printf("\n");
+
+        printf("R: ");
+        for (long long k = 0; k <= lcp; ++k) {
+            printf("%lld ", R[k]);
+        }
+        printf("\n");
+
+        printf("new-lcp=%lld\n", suff_arr.LCP()[i].len);
+        )
+
+        if (suff_arr.LCP()[i].len > lcp) {
+    
+            last.push(lcp);
+            lcp = suff_arr.LCP()[i].len;
+
+            L[lcp] = suff_arr.LCP()[i - 1].index;            
+            R[lcp] = suff_arr.LCP()[i - 1].index;            
+             
+            L[lcp] = std::min(L[lcp], suff_arr.LCP()[i].index);
+            R[lcp] = std::max(R[lcp], suff_arr.LCP()[i].index);
+       
+        } else if (suff_arr.LCP()[i].len < lcp) {
+
+            long long res = R[lcp] - L[lcp] + lcp + lcp * lcp;
+            if (ans < res) {
+                ans = res;
+            }
+            V(
+            printf("res:: lcp=%lld (%lld;%lld) -> %lld\n",
+                    lcp, L[lcp], R[lcp], res);
+            ) 
+
+            while (!last.empty() && last.top() > suff_arr.LCP()[i].len) {
+                
+                long long k = last.top();
+                last.pop();
+
+                L[k] = std::min(L[k], L[lcp]);
+                R[k] = std::max(R[k], R[lcp]);
+
+                if (R[lcp] == 10000000LL || L[lcp] == -10000000LL) {
+                    abort();
+                }
+
+                long long res = R[k] - L[k] + k + k * k;
+                if (ans < res) {
+                    ans = res;
+                }
+    
+                V(
+                printf("res:: lcp=%lld (%lld;%lld) -> %lld\n",
+                        lcp, L[lcp], R[lcp], res);
+                )
+
+                lcp = k;
+            }
+
+            if (last.top() == suff_arr.LCP()[i].len) {
+                
+                last.pop();
+            
+            } else {
+                
+                L[suff_arr.LCP()[i].len] = L[lcp];
+                R[suff_arr.LCP()[i].len] = R[lcp];
+            }
+
+            lcp = suff_arr.LCP()[i].len;
+
+        } else {
+            
+            L[lcp] = std::min(L[lcp], suff_arr.LCP()[i].index);
+            R[lcp] = std::max(R[lcp], suff_arr.LCP()[i].index);
+
+        }
+
+        V(
+        printf("================================\n");
+        )
+    }
+ 
+    while (!last.empty()) {
+                
+        long long k = last.top();
+        last.pop();
+
+        L[k] = std::min(L[k], L[lcp]);
+        R[k] = std::max(R[k], R[lcp]);
+
+                if (R[lcp] == 10000000LL || L[lcp] == -10000000LL) {
+                    abort();
+                }
+
+        long long res = R[lcp] - L[lcp] + lcp + lcp * lcp;
+        if (ans < res) {
+            ans = res;
+        }
+   
+        V(
+        printf("res:: lcp=%lld (%lld;%lld) -> %lld\n",
+                lcp, L[lcp], R[lcp], res);
+        )    
+    
+        lcp = k;
     }
 
+    printf("%lld\n", ans);
 
     return 0;
 }
@@ -182,12 +265,12 @@ void SuffixArray::build_array() {
 
     sort_suffixes();
 
-    std::vector<int> where(arr.size(), 0);
+    std::vector<long long> where(arr.size(), 0);
 
     for (size_t h = 4; h < 2 * arr.size(); h *= 2) {
 
-        int n_ranks = 1;
-        int prev_rank = arr[0].rank[0];
+        long long n_ranks = 1;
+        long long prev_rank = arr[0].rank[0];
 
         arr[0].rank[0] = n_ranks;
         where[arr[0].index] = 0;     
@@ -212,7 +295,7 @@ void SuffixArray::build_array() {
 
         for (size_t i = 0; i < arr.size(); ++i) {
 
-            int next_half = arr[i].index + h / 2;
+            long long next_half = arr[i].index + h / 2;
                 
             arr[i].rank[1] = 0;
             if (next_half < arr.size()) {
@@ -239,18 +322,18 @@ void SuffixArray::sort_suffixes() {
 
 void SuffixArray::count_sort(std::vector<Suffix>& input, 
                              std::vector<Suffix>& output,
-                             const int& rk) {
+                             const long long& rk) {
 
-    std::vector<int> cnt(std::max(input.size() + 10, static_cast<size_t>(('z' - 'a') + 10)), 0);
+    std::vector<long long> cnt(std::max(input.size() + 10, static_cast<size_t>(('z' - 'a') + 10)), 0);
     output.resize(input.size());
 
     for (size_t i = 0; i < input.size(); ++i) {
         cnt[input[i].rank[rk]]++; 
     }
    
-    int count = 0;
+    long long count = 0;
     for (size_t i = 0; i < cnt.size(); ++i) {
-        int tmp = cnt[i];
+        long long tmp = cnt[i];
         cnt[i] = count;
         count += tmp;
     }
@@ -279,12 +362,16 @@ void SuffixArray::build_LCP() {
         return;
     }
 
-    std::vector<int> where(arr.size());
+    if (!arr_built) {
+        build_array();
+    }
+
+    std::vector<long long> where(arr.size());
     for (size_t i = 0; i < arr.size(); ++i) {
         where[arr[i].index] = i;
     }
 
-    int k = 0;
+    long long k = 0;
     for (int i = 0; i < arr.size(); ++i) {
 
         if (k > 0) {
@@ -299,7 +386,7 @@ void SuffixArray::build_LCP() {
 
         } else {
 
-            int j = arr[where[i] - 1].index;
+            long long j = arr[where[i] - 1].index;
             
             while (std::max(i + k, j + k) < arr.size() &&
                    string[i + k] == string[j + k]) {
@@ -311,85 +398,6 @@ void SuffixArray::build_LCP() {
     }
 
     lcp_built = true;
-}
-/*############################################################################*/
-
-bool operator<(const Key& key1, const Key& key2) {
- 
-    if (key1.value == key2.value) {
- 
-        return key1.idx < key2.idx;
- 
-    }
- 
-    return key1.value < key2.value;
-}
- 
-template <class Key>
-SparseTable<Key>::SparseTable(const std::vector<key_t>& init_data) :
-        size(init_data.size()),
-        height(0) {
- 
-    log2 = new size_t[size + 1];
- 
-    for (size_t i = 1, pow = 1; i <= size; ++i) {
- 
-        if (i == pow) {
-            pow <<= 1;
-            ++height;
-        }
- 
-        log2[i] = height - 1;
-    }
- 
-    pow2 = new size_t[height];
- 
-    for (size_t i = 0, pow = 1; i < height; ++i, pow <<= 1) {
-        pow2[i] = pow;
-    }
- 
-    table = new key_t* [height];
- 
-    for (size_t i = 0; i < height; ++i) {
-        table[i] = new key_t[size];
-    }
- 
-    fill_table(init_data);
-}
- 
-template <class Key>
-void SparseTable<Key>::fill_table(const std::vector<key_t>& init_data) {
- 
-    for (size_t j = 0; j < size; ++j) {
-        table[0][j] = init_data[j];
-    }
- 
-    for (size_t step = 1, i = 1; i < height; ++i, step <<= 1) {
-        for (size_t j = 0; j + 2 * step <= size; ++j) {
- 
-            table[i][j] = std::max(table[i - 1][j], table[i - 1][j + step]);
- 
-        }
-    }
-}
- 
-template <class Key>
-Key SparseTable<Key>::get_max(const size_t& l_idx, const size_t& r_idx) {
- 
-    auto degree = log2[r_idx - l_idx + 1];
-    return std::max(table[degree][l_idx], table[degree][r_idx - pow2[degree] + 1]);
-}
- 
-template <class Key>
-SparseTable<Key>::~SparseTable() {
- 
-    for (size_t i = 0; i < height; ++i) {
-        delete[] table[i];
-    }
- 
-    delete[] table;
-    delete[] log2;
-    delete[] pow2;
 }
 
 /*============================================================================*/

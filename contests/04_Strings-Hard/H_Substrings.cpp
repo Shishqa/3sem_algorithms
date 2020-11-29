@@ -2,16 +2,20 @@
 /*============================================================================*/
 
 #include <cassert>
+#include <cstdint>
 
+#include <cstring>
 #include <cstddef>
 #include <cstdio>
 #include <queue>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+/* Generalized */
 class SuffixTree {
 public:
 
@@ -24,9 +28,9 @@ public:
     
         ~Node();
 
-        void attach(Node* node, Char ch);
-
         int edgeLen() const;
+
+        void attach(Node* node, Char ch);
 
         /*##########################################*/
         std::unordered_map<Char, Node*> children;
@@ -36,6 +40,10 @@ public:
 
         int edge_l;
         int edge_r;
+
+        uint64_t visited;
+
+        int str_index; // if list node | else -1
         /*##########################################*/
 
     };
@@ -47,15 +55,18 @@ public:
 
     explicit SuffixTree(const Char* str);
 
-    void widen(size_t len);
+    void add(size_t len);
 
-    bool has(const Char* str, size_t len);
+    const char* findLCS(int& len);
 
     void dump(const char* label);
 
     ~SuffixTree();
 
 private:
+
+    uint64_t traverseLCS(Node* node, int current_len, 
+                         int& max_len, int& start_idx);
 
     void dump(int iter);
 
@@ -81,6 +92,8 @@ private:
 
     const char* buf;
     size_t buf_len;
+
+    int num_strings;
     /*######################################*/
 
     FILE* DUMP_STREAM;
@@ -90,35 +103,76 @@ private:
 
 int main(int argc, char *argv[]) {
 
-    char buffer[500000] = "";
-    int string_len = 0;
-    scanf("%s%n", buffer, &string_len);
+    char buf[200000] = "";
+    int buf_len = 0;
+    
+    SuffixTree tree(buf); 
 
-    buffer[string_len] = '$';
+    size_t n_strings = 0;
+    scanf("%lu\n", &n_strings);
 
-    SuffixTree tree(buffer); 
-    tree.widen(string_len + 1);
+    int delta = 0;
+    for (size_t i = 0; i < n_strings; ++i) {
+        
+        scanf("%s", buf + buf_len);
+        
+        delta = strlen(buf + buf_len);
+        buf_len += delta;
+        buf[buf_len++] = '0' + i;
+
+        tree.add(delta + 1);
+    }
+
+    int lcs_len = 0;
+    const char* lcs = tree.findLCS(lcs_len);
+
+    //tree.dump("after_lcs");
+
+    printf("%.*s\n", lcs_len, lcs);
 
     return 0;
 }
 
 /*############################################################################*/
 
-bool SuffixTree::has(const Char* str, size_t len) {
+const char* SuffixTree::findLCS(int& len) 
+{
+    len = 0;
+    int start_idx = 0;
+    traverseLCS(root, 0, len, start_idx);
 
-    SuffTerminal finder = {root, -1};
+    return buf + start_idx;
+}
 
-    for (size_t i = 0; i < len; ++i) {
+/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-        if (!canWalk(finder, str[i])) {
-            printf("failed at len %lu\n", i);
-            return false;
+uint64_t SuffixTree::traverseLCS(Node* node, int current_len, 
+                                 int& max_len, int& start_idx) 
+{
+    node->visited = 0;
+
+    if (-1 == node->str_index) {
+
+        for (auto& child : node->children) {
+
+            node->visited |= traverseLCS(child.second, current_len + child.second->edgeLen(), 
+                                         max_len, start_idx);
+
         }
-   
-        walk(finder, str[i]);
+       
+        if (node->visited == (1 << num_strings) - 1) {
+            if (max_len < current_len) {
+                max_len = current_len;
+                start_idx = node->edge_r + 1 - current_len;
+            }
+        }
+
+    } else {
+
+        node->visited |= 1 << node->str_index;
     }
 
-    return true;
+    return node->visited;
 }
 
 /*############################################################################*/
@@ -213,6 +267,7 @@ void SuffixTree::extend(int pos)
     while (!canWalk(lastPending, buf[pos])) {
 
         Node* list = new Node(nullptr, pos, buf_len - 1);
+        list->str_index = num_strings;
 
         if (isEdgeExtendable(lastPending)) {
 
@@ -298,30 +353,32 @@ SuffixTree::SuffixTree(const Char* str)
     , buf_len(0) {
 
     root = new Node(nullptr, -1, -1); 
-    lastPending = {root, -1};
 
-    DUMP_STREAM = fopen("SuffTree-dump.dot", "w");
-    fprintf(DUMP_STREAM, "digraph SuffixTree {\n");
+    //DUMP_STREAM = fopen("SuffTree-dump.dot", "w");
+    //fprintf(DUMP_STREAM, "digraph SuffixTree {\n");
+
+    lastPending = {root, -1};
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-void SuffixTree::widen(size_t len) {
-
+void SuffixTree::add(size_t len) 
+{
     buf_len += len;
-
     for (int i = buf_len - len; i < buf_len; ++i) {
         extend(i);
-        dump(i);
+        //dump(i + 1);
     }
+    
+    ++num_strings;
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 SuffixTree::~SuffixTree() {
-
-    fprintf(DUMP_STREAM, "}\n");
-    fclose(DUMP_STREAM);
+    
+    //fprintf(DUMP_STREAM, "}\n");
+    //fclose(DUMP_STREAM);
 
     delete root;
 }
@@ -333,6 +390,8 @@ SuffixTree::Node::Node(Node* parent, int l, int r)
         , suff_link(this)
         , edge_l(l)
         , edge_r(r)
+        , str_index(-1)
+        , visited(0)
         { }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -351,25 +410,25 @@ int SuffixTree::Node::edgeLen() const {
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-void SuffixTree::Node::attach(Node *node, Char ch) {
+void SuffixTree::Node::attach(Node* node, Char ch) {
     node->parent = this;
     children[ch] = node;
 }
 
 /*############################################################################*/
 
-void SuffixTree::dump(const char* label) {
- 
+void SuffixTree::dump(const char *label) {
+
     fprintf(DUMP_STREAM, 
             "subgraph cluster_%s {\n"
             "\tgraph [color=black; label=\"%s\"];\n"
-            "\tnode [shape=point];\n",
+            "\tnode [shape=record];\n",
             label, label);
 
     dump();
 
     fprintf(DUMP_STREAM, "}\n");
-      
+
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -379,21 +438,22 @@ void SuffixTree::dump(int iter) {
     fprintf(DUMP_STREAM, 
             "subgraph cluster_%d {\n"
             "\tgraph [color=black; label=\"Iteration %d : %.*s\"];\n"
-            "\tnode [shape=point];\n",
+            "\tnode [shape=record];\n",
             iter, iter, iter, buf);
 
     dump();
 
-    fprintf(DUMP_STREAM, "}\n");
+    fprintf(DUMP_STREAM, 
+            "}\n");
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 void SuffixTree::dump() {
-    
-    static int helper = 0;
+   
+    static int iter = 0;
 
-        std::queue<Node*> to_visit;
+    std::queue<Node*> to_visit;
     to_visit.push(root);
 
     while (!to_visit.empty()) {
@@ -402,15 +462,18 @@ void SuffixTree::dump() {
         to_visit.pop();
 
         fprintf(DUMP_STREAM, 
-                "\t\"node%d%p\" [color=%s, label=\"\"];\n",
-                helper, reinterpret_cast<void*>(target),
-                (target == root) ? "violet" : "black");
+                "\t\"node%d%p\" [color=%s, label=\"%d | %lu\"];\n",
+                iter, reinterpret_cast<void*>(target),
+                (target == root) ? "violet" : "black",
+                target->str_index, target->visited);
 
-        fprintf(DUMP_STREAM, 
+        /*
+        fprintf(fstream, 
                 "\t\"node%d%p\" -> \"node%d%p\" [color=red];\n",
-                helper, reinterpret_cast<void*>(target),
-                helper, reinterpret_cast<void*>(target->suff_link)
+                iter, reinterpret_cast<void*>(target),
+                iter, reinterpret_cast<void*>(target->suff_link)
                 );
+        */
 
         for (auto& child : target->children) {
 
@@ -418,30 +481,32 @@ void SuffixTree::dump() {
 
             fprintf(DUMP_STREAM, 
                     "\t\"node%d%p\" -> \"node%d%p\" [label=\"%.*s\"];\n",
-                    helper, reinterpret_cast<void*>(target),
-                    helper, reinterpret_cast<Node*>(child.second),
+                    iter, reinterpret_cast<void*>(target),
+                    iter, reinterpret_cast<Node*>(child.second),
                     child.second->edgeLen(), 
                     buf + child.second->edge_l
                     );
         }
     }
 
-    fprintf(DUMP_STREAM, 
+    /*
+    fprintf(fstream, 
             "\t\"lastPending%d\" [shape=box,color=yellow,label=\"lastPending: idx=%d\"];\n"
             "\t\"lastPending%d\" -> \"node%d%p\" [style=dotted];\n",
-            helper, lastPending.idx - lastPending.node->edge_l,
-            helper, helper, reinterpret_cast<void*>(lastPending.node)
+            iter, lastPending.idx - lastPending.node->edge_l,
+            iter, iter, reinterpret_cast<void*>(lastPending.node)
             );
 
     if (waitingForLink) {
-        fprintf(DUMP_STREAM, 
+        fprintf(fstream, 
                 "\t\"waitingForLink%d\" [shape=box,color=green,label=\"waitingForLink\"];\n"
                 "\t\"waitingForLink%d\" -> \"node%d%p\" [style=dotted];\n",
-                helper, helper, helper, reinterpret_cast<void*>(waitingForLink)
+                iter, iter, iter, reinterpret_cast<void*>(waitingForLink)
                 );
     }
+    */
 
-    ++helper;
+    ++iter;
 }
 
 /*============================================================================*/
